@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Items>
+	<Item
+		id="ps_peasant_rags"
+		name="{=ps_peasant_rags}Peasant Rags"
+		mesh="vlandia_bandit_c"
+		weight="0.4"
+		is_merchandise="false"
+		value="1"
+		Type="BodyArmor">
+		<ItemComponent>
+			<Armor
+				has_gender_variations="true"
+				covers_body="false"
+				modifier_group="cloth_unarmoured"
+				material_type="Cloth" />
+		</ItemComponent>
+		<Flags
+			UseTeamColor="true"
+			DoesNotHideChest="true"
+			Civilian="true"
+			Stealth="true" />
+	</Item>
+</Items>

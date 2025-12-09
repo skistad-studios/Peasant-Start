@@ -1,0 +1,38 @@
+<Module>
+	<Name value="Peasant Start"/>
+	<Id value="PeasantStart"/>
+	<Version value="v1.0.0"/>
+	<SingleplayerModule value="true"/>
+	<MultiplayerModule value="false"/>
+	<Url value="https://www.nexusmods.com/mountandblade2bannerlord/mods/9354" />
+	<DependedModules>
+		<DependedModule Id="Native"/>
+		<DependedModule Id="SandBoxCore"/>
+		<DependedModule Id="Sandbox"/>
+		<DependedModule Id="CustomBattle"/>
+		<DependedModule Id="StoryMode"/>
+		<DependedModule Id="Bannerlord.Harmony"/>
+	</DependedModules>
+	<SubModules>
+		<SubModule>
+			<Name value="PeasantStart"/>
+			<DLLName value="PeasantStart.dll"/>
+			<SubModuleClassType value="PeasantStart.SubModule"/>
+			<Tags>
+				<Tag key="DedicatedServerType" value="none" />
+				<Tag key="IsNoRenderModeElement" value="false" />
+			</Tags>
+		</SubModule>
+	</SubModules>
+	<Xmls>
+		<XmlNode>
+			<XmlName id="Items" path="items" />
+			<IncludedGameTypes>
+				<GameType value="Campaign" />
+				<GameType value="CampaignStoryMode" />
+				<GameType value="CustomGame" />
+				<GameType value="EditorGame" />
+			</IncludedGameTypes>
+		</XmlNode>
+	</Xmls>
+</Module>

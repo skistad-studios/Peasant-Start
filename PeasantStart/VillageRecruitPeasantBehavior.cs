@@ -1,0 +1,351 @@
+﻿using System;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.Localization;
+
+namespace PeasantStart
+{
+    internal class VillageRecruitPeasantBehavior : CampaignBehaviorBase
+    {
+        private const int HoursToRecruit = 4;
+        private const int RecruitStartHour = 4;
+        private const int RecruitEndHour = 22;
+
+        private const float CharmXpPerHour = 2.0f;
+
+        private const float BaseRecruitChance = 0.1f;
+        private const float MaxRecruitChance = 0.95f;
+        private const int MaxPeasantsPerRecruitment = 6;
+        private const int CostToHirePeasant = 10;
+
+        private bool isRecruiting;
+        private int hoursRecruited;
+        private int recruitStamina;
+        private int peasantsRecruited;
+
+        public override void RegisterEvents()
+        {
+            CampaignEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, OnCharacterCreationIsOver);
+            CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, this.OnSessionLaunched);
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, this.OnHourlyTick);
+            CampaignEvents.VillageBeingRaided.AddNonSerializedListener(this, this.OnVillageBeingRaided);
+        }
+
+        public override void SyncData(IDataStore dataStore)
+        {
+            dataStore.SyncData("ps_isRecruiting", ref this.isRecruiting);
+            dataStore.SyncData("ps_hoursRecruited", ref this.hoursRecruited);
+            dataStore.SyncData("ps_recruitStamina", ref this.recruitStamina);
+            dataStore.SyncData("ps_peasantsRecruited", ref this.peasantsRecruited);
+        }
+
+        internal void StartRecruiting()
+        {
+            if (Settlement.CurrentSettlement == null)
+            {
+                return;
+            }
+
+            if (this.isRecruiting)
+            {
+                return;
+            }
+
+            this.isRecruiting = true;
+            this.hoursRecruited = 0;
+            this.peasantsRecruited = 0;
+
+            GameMenu.SwitchToMenu("ps_village_recruiting");
+        }
+
+        internal void StopRecruiting()
+        {
+            if (Settlement.CurrentSettlement == null)
+            {
+                return;
+            }
+
+            if (!this.isRecruiting)
+            {
+                return;
+            }
+
+            this.isRecruiting = false;
+
+            if (this.hoursRecruited >= HoursToRecruit)
+            {
+                this.peasantsRecruited = this.RollPeasantsRecruited();
+                GameMenu.SwitchToMenu("ps_village_pick_recruits");
+            }
+            else
+            {
+                GameMenu.SwitchToMenu("village");
+            }
+        }
+
+        internal void RecruitHour()
+        {
+            if (Settlement.CurrentSettlement == null)
+            {
+                return;
+            }
+
+            if (this.recruitStamina <= 0)
+            {
+                return;
+            }
+
+            this.hoursRecruited += 1;
+            this.recruitStamina -= 1;
+
+            this.GrantRecruitXp(Hero.MainHero);
+
+            if (this.hoursRecruited >= HoursToRecruit)
+            {
+                this.StopRecruiting();
+            }
+        }
+
+        internal void RecruitPeasants(int amount)
+        {
+            if (Settlement.CurrentSettlement == null)
+            {
+                return;
+            }
+
+            int recruitmentCost = this.GetRecruitmentCost(amount);
+
+            if (Hero.MainHero.Gold < recruitmentCost)
+            {
+                return;
+            }
+
+            CharacterObject peasantCharacter = this.GetPeasantFromCulture(Settlement.CurrentSettlement.Culture);
+
+            if (peasantCharacter == null)
+            {
+                return;
+            }
+
+            PartyBase.MainParty.AddElementToMemberRoster(peasantCharacter, amount);
+            GiveGoldAction.ApplyForCharacterToSettlement(Hero.MainHero, Settlement.CurrentSettlement, recruitmentCost);
+        }
+
+        internal void GrantRecruitXp(Hero hero)
+        {
+            hero.AddSkillXp(DefaultSkills.Charm, CharmXpPerHour);
+        }
+
+        internal int RollPeasantsRecruited()
+        {
+            int count = 0;
+            float recruitChance = this.GetPeasantRecruitChance();
+            for (int i = 0; i < MaxPeasantsPerRecruitment; i += 1)
+            {
+                if (MBRandom.RandomFloat <= recruitChance)
+                {
+                    count += 1;
+                }
+            }
+
+            return count;
+        }
+
+        internal float GetPeasantRecruitChance()
+        {
+            return Math.Min(BaseRecruitChance + (Hero.MainHero.GetSkillValue(DefaultSkills.Charm) * 0.01f), MaxRecruitChance);
+        }
+
+        internal CharacterObject GetPeasantFromCulture(CultureObject culture)
+        {
+            return CharacterObject.FindFirst(character => character.Culture == Settlement.CurrentSettlement.Culture && character.Tier == 0 && character.Occupation == Occupation.Villager && !character.IsHero);
+        }
+
+        internal int GetRecruitmentCost(int numberOfPeasants)
+        {
+            return numberOfPeasants * CostToHirePeasant;
+        }
+
+        private void AddMenuOption(CampaignGameStarter campaignGameStarter)
+        {
+            // Village recruit option
+            campaignGameStarter.AddGameMenuOption(
+                "village",
+                "ps_recruit",
+                "{=ps_recruit}Recruit Peasants",
+                (MenuCallbackArgs args) =>
+                {
+                    bool canRecruit = this.recruitStamina >= HoursToRecruit && CampaignTime.Now.CurrentHourInDay >= RecruitStartHour && CampaignTime.Now.CurrentHourInDay < RecruitEndHour;
+                    
+                    if (canRecruit)
+                    {
+                        args.Tooltip = new TextObject("{=ps_recruit_tooltip}Try to convince local peasants to join you.");
+                    }
+                    else
+                    {
+                        if (CampaignTime.Now.CurrentHourInDay < RecruitStartHour)
+                        {
+                            args.Tooltip = new TextObject("{=ps_recruit_too_early_tooltip}Everyone is still asleep.");
+                        }
+                        else if (CampaignTime.Now.CurrentHourInDay >= RecruitEndHour)
+                        {
+                            args.Tooltip = new TextObject("{=ps_recruit_too_late_tooltip}Everyone has went to sleep.");
+                        }
+                        else
+                        {
+                            MBTextManager.SetTextVariable("ps_hours_remaining_until_can_recruit", HoursToRecruit - this.recruitStamina);
+                            args.Tooltip = new TextObject("{=ps_recruit_too_tired_tooltip}You are too exhausted to sound convincing. You can attempt again in {ps_hours_remaining_until_can_recruit} hours.");
+                        }
+                    }
+
+                    args.IsEnabled = canRecruit;
+                    args.optionLeaveType = GameMenuOption.LeaveType.Recruit;
+
+                    return true;
+                },
+                (MenuCallbackArgs args) =>
+                {
+                    this.StartRecruiting();
+                });
+
+            // Recruiting menu
+            campaignGameStarter.AddWaitGameMenu(
+                "ps_village_recruiting",
+                "{ps_recruiting_description}",
+                null,
+                (MenuCallbackArgs args) =>
+                {
+                    MBTextManager.SetTextVariable("ps_recruiting_description", "{=ps_recruiting_description}You attempt to convince some local peasants to join you.");
+                    args.MenuContext.GameMenu.SetProgressOfWaitingInMenu(0);
+                    args.MenuContext.GameMenu.StartWait();
+                    return true;
+                },
+                null,
+                (MenuCallbackArgs args, CampaignTime dt) =>
+                {
+                    args.MenuContext.GameMenu.SetProgressOfWaitingInMenu((float)this.hoursRecruited / HoursToRecruit);
+                },
+                GameMenu.MenuAndOptionType.WaitMenuShowOnlyProgressOption);
+
+            // Stop recruiting option
+            campaignGameStarter.AddGameMenuOption(
+                "ps_village_recruiting",
+                "ps_village_stop_recruiting",
+                "{=ps_stop_recruiting]}Stop recruiting",
+                (MenuCallbackArgs args) =>
+                {
+                    args.optionLeaveType = GameMenuOption.LeaveType.Leave;
+                    return true;
+                },
+                (MenuCallbackArgs args) =>
+                {
+                    this.StopRecruiting();
+                });
+
+            // Pick recruits menu
+            campaignGameStarter.AddGameMenu(
+                "ps_village_pick_recruits",
+                "{ps_pick_recruits_description}",
+                (MenuCallbackArgs args) =>
+                {
+                    if (this.peasantsRecruited > 0)
+                    {
+                        MBTextManager.SetTextVariable("ps_peasants_recruited", this.peasantsRecruited);
+                        MBTextManager.SetTextVariable("ps_peasant_peasants", this.peasantsRecruited > 1 ? "{=ps_peasants}peasants" : "{=ps_peasant}peasant");
+                        MBTextManager.SetTextVariable("ps_pick_recruits_description", "{=ps_recruit_success}You managed to convince {ps_peasants_recruited} {ps_peasant_peasants} to join your cause.");
+                    }
+                    else
+                    {
+                        MBTextManager.SetTextVariable("ps_pick_recruits_description", "{=ps_recruit_failure}You didn't manage to convince anyone to join your cause.");
+                    }
+                });
+
+            // Pick recruits menu options
+            for (int i = 0; i < MaxPeasantsPerRecruitment; i += 1)
+            {
+                int n = i;
+                int costToHire = this.GetRecruitmentCost(n + 1);
+                campaignGameStarter.AddGameMenuOption(
+                "ps_village_pick_recruits",
+                $"ps_hire_recruits_{n}",
+                "{ps_hire_recruits_option_name_" + n + "}",
+                (MenuCallbackArgs args) =>
+                {
+                    MBTextManager.SetTextVariable($"ps_hire_count_{n}", n + 1);
+                    MBTextManager.SetTextVariable($"ps_peasant_peasants_{n}", n > 0 ? "{=ps_peasants}peasants" : "{=ps_peasant}peasant");
+                    MBTextManager.SetTextVariable($"ps_hiring_cost_{n}", costToHire);
+                    MBTextManager.SetTextVariable(
+                        $"ps_hire_recruits_option_name_{n}",
+                        "{=ps_hire_recruits}Hire {ps_hire_count} {ps_peasant_peasants} for {ps_hiring_cost}{GOLD_ICON}"
+                        .Replace("{ps_hire_count}", "{ps_hire_count_" + n + "}")
+                        .Replace("{ps_peasant_peasants}", "{ps_peasant_peasants_" + n + "}")
+                        .Replace("{ps_hiring_cost}", "{ps_hiring_cost_" + n + "}"));
+
+                    bool canHire = Hero.MainHero.Gold >= costToHire;
+                    if (!canHire)
+                    {
+                        args.Tooltip = new TextObject("{=ps_recruit_not_enough_gold}You can't affoard this.");
+                    }
+
+                    args.IsEnabled = canHire;
+                    args.optionLeaveType = GameMenuOption.LeaveType.Recruit;
+                    return this.peasantsRecruited > n;
+                },
+                (MenuCallbackArgs args) =>
+                {
+                    this.RecruitPeasants(n + 1);
+                    GameMenu.SwitchToMenu("village");
+                });
+            }
+
+            // Leave pick recruits menu option
+            campaignGameStarter.AddGameMenuOption(
+                "ps_village_pick_recruits",
+                "ps_village_leave_pick_recruits",
+                "{=ps_leave]}Leave",
+                (MenuCallbackArgs args) =>
+                {
+                    args.optionLeaveType = GameMenuOption.LeaveType.Leave;
+                    return true;
+                },
+                (MenuCallbackArgs args) =>
+                {
+                    GameMenu.SwitchToMenu("village");
+                });
+        }
+
+        private void OnCharacterCreationIsOver()
+        {
+            this.recruitStamina = HoursToRecruit;
+        }
+
+        private void OnSessionLaunched(CampaignGameStarter starter)
+        {
+            this.AddMenuOption(starter);
+        }
+
+        private void OnHourlyTick()
+        {
+            if (isRecruiting)
+            {
+                this.RecruitHour();
+            }
+            else if (this.recruitStamina < HoursToRecruit)
+            {
+                this.recruitStamina += 1;
+            }
+        }
+
+        private void OnVillageBeingRaided(Village village)
+        {
+            if (isRecruiting && village == Settlement.CurrentSettlement.Village)
+            {
+                this.StopRecruiting();
+            }
+        }
+    }
+}

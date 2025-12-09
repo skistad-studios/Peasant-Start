@@ -1,0 +1,1 @@
+You? You're no noble! Know your place. Start as a peasant, with nothing to your name. Work in villages to earn a meager living, and convince other peasants to join your cause. For those looking for a true "Zero to Hero" or "Start from nothing" experience.

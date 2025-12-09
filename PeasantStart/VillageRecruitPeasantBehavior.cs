@@ -3,6 +3,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
@@ -13,23 +14,24 @@ namespace PeasantStart
     {
         private const int HoursToRecruit = 4;
 
-        private const float BaseRecruitChance = 0.05f;
+        private const float BaseRecruitChance = 0.2f;
         private const float MaxRecruitChance = 0.95f;
         private const int MaxPeasantsPerRecruitment = 6;
         private const int CostToHirePeasant = 10;
 
-        private const float CharmXpPerHour = 2.0f;
+        private const float CharmXpPerHour = 4.0f;
 
         private bool isRecruiting;
         private int hoursRecruited;
         private int recruitStamina;
         private int peasantsRecruited;
+        private Settlement lastRecruitedSettlement;
 
         public override void RegisterEvents()
         {
-            CampaignEvents.OnCharacterCreationIsOverEvent.AddNonSerializedListener(this, OnCharacterCreationIsOver);
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, this.OnSessionLaunched);
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, this.OnHourlyTick);
+            CampaignEvents.BeforeSettlementEnteredEvent.AddNonSerializedListener(this, this.OnBeforeSettlementEntered);
             CampaignEvents.VillageBeingRaided.AddNonSerializedListener(this, this.OnVillageBeingRaided);
         }
 
@@ -39,6 +41,7 @@ namespace PeasantStart
             dataStore.SyncData("ps_hoursRecruited", ref this.hoursRecruited);
             dataStore.SyncData("ps_recruitStamina", ref this.recruitStamina);
             dataStore.SyncData("ps_peasantsRecruited", ref this.peasantsRecruited);
+            dataStore.SyncData("ps_lastRecruitedSettlement", ref this.lastRecruitedSettlement);
         }
 
         internal void StartRecruiting()
@@ -56,6 +59,7 @@ namespace PeasantStart
             this.isRecruiting = true;
             this.hoursRecruited = 0;
             this.peasantsRecruited = 0;
+            this.lastRecruitedSettlement = Settlement.CurrentSettlement;
 
             GameMenu.SwitchToMenu("ps_village_recruiting");
         }
@@ -77,6 +81,7 @@ namespace PeasantStart
             if (this.hoursRecruited >= HoursToRecruit)
             {
                 this.peasantsRecruited = this.RollPeasantsRecruited();
+                this.recruitStamina = 0;
                 GameMenu.SwitchToMenu("ps_village_pick_recruits");
             }
             else
@@ -97,14 +102,16 @@ namespace PeasantStart
                 return;
             }
 
-            this.hoursRecruited += 1;
-            this.recruitStamina -= 1;
-
-            this.GrantRecruitXp(Hero.MainHero);
-
-            if (this.hoursRecruited >= HoursToRecruit)
+            if (this.hoursRecruited > 0 || (CampaignTime.Now.CurrentHourInDay > Utilities.PeasantWakeUpHour && CampaignTime.Now.CurrentHourInDay <= Utilities.PeasantSleepHour && this.hoursRecruited < HoursToRecruit))
             {
-                this.StopRecruiting();
+                this.hoursRecruited += 1;
+
+                this.GrantRecruitXp(Hero.MainHero);
+
+                if (this.hoursRecruited >= HoursToRecruit)
+                {
+                    this.StopRecruiting();
+                }
             }
         }
 
@@ -177,25 +184,17 @@ namespace PeasantStart
                 "{=ps_recruit_peasants}Recruit Peasants",
                 (MenuCallbackArgs args) =>
                 {
-                    bool canRecruit = this.recruitStamina >= HoursToRecruit && CampaignTime.Now.CurrentHourInDay >= Utilities.PeasantWakeUpHour && CampaignTime.Now.CurrentHourInDay < Utilities.PeasantSleepHour;
-                    
+                    bool canRecruit = this.recruitStamina >= HoursToRecruit;
+
                     if (!canRecruit)
                     {
-                        if (CampaignTime.Now.CurrentHourInDay < Utilities.PeasantWakeUpHour || CampaignTime.Now.CurrentHourInDay >= Utilities.PeasantSleepHour)
-                        {
-                            args.Tooltip = new TextObject("{=ps_recruit_asleep_tooltip}Everyone is asleep.");
-                        }
-                        else
-                        {
-                            MBTextManager.SetTextVariable("ps_hours_remaining_until_can_recruit", HoursToRecruit - this.recruitStamina);
-                            MBTextManager.SetTextVariable("ps_hour_hours", HoursToRecruit - this.recruitStamina > 1 ? "{=ps_hours}hours" : "{=ps_hour}hour");
-                            args.Tooltip = new TextObject("{=ps_recruit_cooldown_tooltip}You recently recruited. You can attempt again in {ps_hours_remaining_until_can_recruit} {ps_hour_hours}.");
-                        }
+                        MBTextManager.SetTextVariable("ps_hours_remaining_until_can_recruit", HoursToRecruit - this.recruitStamina);
+                        MBTextManager.SetTextVariable("ps_hour_hours", HoursToRecruit - this.recruitStamina > 1 ? "{=ps_hours}hours" : "{=ps_hour}hour");
+                        args.Tooltip = new TextObject("{=ps_recruit_cooldown_tooltip}You recently recruited. You can attempt again in {ps_hours_remaining_until_can_recruit} {ps_hour_hours}, or try another village.");
                     }
 
                     args.IsEnabled = canRecruit;
                     args.optionLeaveType = GameMenuOption.LeaveType.Recruit;
-
                     return true;
                 },
                 (MenuCallbackArgs args) =>
@@ -210,16 +209,14 @@ namespace PeasantStart
                 null,
                 (MenuCallbackArgs args) =>
                 {
-                    MBTextManager.SetTextVariable("ps_recruiting_description", "{=ps_recruiting_description}You attempt to convince some local peasants to join you.");
-                    args.MenuContext.SetBackgroundMeshName(Settlement.CurrentSettlement.Culture.StringId + "_tavern");
-                    args.MenuContext.GameMenu.SetProgressOfWaitingInMenu(this.hoursRecruited < HoursToRecruit ? (float)this.hoursRecruited / HoursToRecruit : 0);
+                    this.UpdateRecruitingMenu(args);
                     args.MenuContext.GameMenu.StartWait();
                     return true;
                 },
                 null,
                 (MenuCallbackArgs args, CampaignTime dt) =>
                 {
-                    args.MenuContext.GameMenu.SetProgressOfWaitingInMenu(this.hoursRecruited < HoursToRecruit ? (float)this.hoursRecruited / HoursToRecruit : 0);
+                    this.UpdateRecruitingMenu(args);
                 },
                 GameMenu.MenuAndOptionType.WaitMenuShowOnlyProgressOption);
 
@@ -312,9 +309,20 @@ namespace PeasantStart
                 });
         }
 
-        private void OnCharacterCreationIsOver()
+        private void UpdateRecruitingMenu(MenuCallbackArgs args)
         {
-            this.recruitStamina = HoursToRecruit;
+            if (this.hoursRecruited <= 0 && (CampaignTime.Now.CurrentHourInDay < Utilities.PeasantWakeUpHour || CampaignTime.Now.CurrentHourInDay >= Utilities.PeasantSleepHour))
+            {
+                args.Tooltip = new TextObject("{=ps_recruiting_description_asleep}Everyone is asleep.");
+                args.MenuContext.SetBackgroundMeshName(Settlement.CurrentSettlement.SettlementComponent.WaitMeshName);
+            }
+            else
+            {
+                MBTextManager.SetTextVariable("ps_recruiting_description_recruiting", "{=ps_recruiting_description}You attempt to convince some local peasants to join you.");
+                args.MenuContext.SetBackgroundMeshName(Settlement.CurrentSettlement.Culture.StringId + "_tavern");
+            }
+
+            args.MenuContext.GameMenu.SetProgressOfWaitingInMenu(this.hoursRecruited < HoursToRecruit ? (float)this.hoursRecruited / HoursToRecruit : 0);
         }
 
         private void OnSessionLaunched(CampaignGameStarter starter)
@@ -331,6 +339,14 @@ namespace PeasantStart
             else if (this.recruitStamina < HoursToRecruit)
             {
                 this.recruitStamina += 1;
+            }
+        }
+
+        private void OnBeforeSettlementEntered(MobileParty party, Settlement settlement, Hero hero)
+        {
+            if (settlement != this.lastRecruitedSettlement)
+            {
+                this.recruitStamina = HoursToRecruit;
             }
         }
 

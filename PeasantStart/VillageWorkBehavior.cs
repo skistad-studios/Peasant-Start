@@ -19,9 +19,9 @@ namespace PeasantStart
         private const int HoursInShift = 8;
 
         private const int Tier0Wage = 0;
-        private const int Tier1Wage = 1;
-        private const int Tier2Wage = 2;
-        private const int Tier3Wage = 3;
+        private const int Tier1Wage = 3;
+        private const int Tier2Wage = 6;
+        private const int Tier3Wage = 9;
 
         private const float Tier0WageWeight = 0.05f;
         private const float Tier1WageWeight = 0.35f;

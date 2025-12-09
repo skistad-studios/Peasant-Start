@@ -141,7 +141,7 @@ namespace PeasantStart
             for (int i = 0; i < workersInParty; i += 1)
             {
                 int wageTier = MBRandom.ChooseWeighted(new List<(int, float)> { (0, Tier0WageWeight), (1, Tier1WageWeight), (2, Tier2WageWeight), (3, Tier3WageWeight) });
-                while (GetWagesFromTier(wageTier) > villageGold)
+                while (GetWagesFromTier(wageTier) > villageGold - goldEarned)
                 {
                     wageTier -= 1;
                 }

@@ -25,13 +25,13 @@ namespace PeasantStart
         private int hoursRecruited;
         private int recruitStamina;
         private int peasantsRecruited;
-        private Settlement lastRecruitedSettlement;
+        private Settlement lastSettlement;
 
         public override void RegisterEvents()
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, this.OnSessionLaunched);
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, this.OnHourlyTick);
-            CampaignEvents.BeforeSettlementEnteredEvent.AddNonSerializedListener(this, this.OnBeforeSettlementEntered);
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, this.OnSettlementEntered);
             CampaignEvents.VillageBeingRaided.AddNonSerializedListener(this, this.OnVillageBeingRaided);
         }
 
@@ -41,7 +41,7 @@ namespace PeasantStart
             dataStore.SyncData("ps_hoursRecruited", ref this.hoursRecruited);
             dataStore.SyncData("ps_recruitStamina", ref this.recruitStamina);
             dataStore.SyncData("ps_peasantsRecruited", ref this.peasantsRecruited);
-            dataStore.SyncData("ps_lastRecruitedSettlement", ref this.lastRecruitedSettlement);
+            dataStore.SyncData("ps_lastRecruitedSettlement", ref this.lastSettlement);
         }
 
         internal void StartRecruiting()
@@ -59,7 +59,6 @@ namespace PeasantStart
             this.isRecruiting = true;
             this.hoursRecruited = 0;
             this.peasantsRecruited = 0;
-            this.lastRecruitedSettlement = Settlement.CurrentSettlement;
 
             GameMenu.SwitchToMenu("ps_village_recruiting");
         }
@@ -97,12 +96,17 @@ namespace PeasantStart
                 return;
             }
 
+            if (!this.isRecruiting)
+            {
+                return;
+            }
+
             if (this.recruitStamina <= 0)
             {
                 return;
             }
 
-            if (this.hoursRecruited > 0 || (CampaignTime.Now.CurrentHourInDay > Utilities.PeasantWakeUpHour && CampaignTime.Now.CurrentHourInDay <= Utilities.PeasantSleepHour && this.hoursRecruited < HoursToRecruit))
+            if (this.hoursRecruited > 0 || (CampaignTime.Now.CurrentHourInDay > Utilities.PeasantWakeUpHour && CampaignTime.Now.CurrentHourInDay <= Utilities.PeasantSleepHour))
             {
                 this.hoursRecruited += 1;
 
@@ -313,12 +317,12 @@ namespace PeasantStart
         {
             if (this.hoursRecruited <= 0 && (CampaignTime.Now.CurrentHourInDay < Utilities.PeasantWakeUpHour || CampaignTime.Now.CurrentHourInDay >= Utilities.PeasantSleepHour))
             {
-                args.Tooltip = new TextObject("{=ps_recruiting_description_asleep}Everyone is asleep.");
+                MBTextManager.SetTextVariable("ps_recruiting_description", "{=ps_recruiting_description_asleep}Everyone is asleep.");
                 args.MenuContext.SetBackgroundMeshName(Settlement.CurrentSettlement.SettlementComponent.WaitMeshName);
             }
             else
             {
-                MBTextManager.SetTextVariable("ps_recruiting_description_recruiting", "{=ps_recruiting_description}You attempt to convince some local peasants to join you.");
+                MBTextManager.SetTextVariable("ps_recruiting_description", "{=ps_recruiting_description_recruiting}You attempt to convince some local peasants to join you.");
                 args.MenuContext.SetBackgroundMeshName(Settlement.CurrentSettlement.Culture.StringId + "_tavern");
             }
 
@@ -342,11 +346,12 @@ namespace PeasantStart
             }
         }
 
-        private void OnBeforeSettlementEntered(MobileParty party, Settlement settlement, Hero hero)
+        private void OnSettlementEntered(MobileParty party, Settlement settlement, Hero hero)
         {
-            if (settlement != this.lastRecruitedSettlement)
+            if (this.lastSettlement != Settlement.CurrentSettlement)
             {
                 this.recruitStamina = HoursToRecruit;
+                this.lastSettlement = Settlement.CurrentSettlement;
             }
         }
 

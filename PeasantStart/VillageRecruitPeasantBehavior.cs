@@ -280,10 +280,17 @@ namespace PeasantStart
                         .Replace("{ps_peasant_peasants}", "{ps_peasant_peasants_" + n + "}")
                         .Replace("{ps_hiring_cost}", "{ps_hiring_cost_" + n + "}"));
 
-                    bool canHire = Hero.MainHero.Gold >= costToHire;
+                    bool canHire = Hero.MainHero.Gold >= costToHire && PartyBase.MainParty.MemberRoster.TotalManCount + n + 1 <= PartyBase.MainParty.PartySizeLimit;
                     if (!canHire)
                     {
-                        args.Tooltip = new TextObject("{=ps_recruit_not_enough_gold_tooltip}You can't affoard this.");
+                        if (Hero.MainHero.Gold < costToHire)
+                        {
+                            args.Tooltip = new TextObject("{=ps_recruit_not_enough_gold_tooltip}You can't affoard this.");
+                        }
+                        else
+                        {
+                            args.Tooltip = new TextObject("{=ps_recruit_not_enough_space_tooltip}You don't have enough room in your party.");
+                        }
                     }
 
                     args.IsEnabled = canHire;

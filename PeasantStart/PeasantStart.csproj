@@ -605,6 +605,7 @@
     <Compile Include="StartingOverrideBehavior.cs" />
     <Compile Include="SubModule.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Utilities.cs" />
     <Compile Include="VillageRecruitPeasantBehavior.cs" />
     <Compile Include="VillageWorkBehavior.cs" />
   </ItemGroup>

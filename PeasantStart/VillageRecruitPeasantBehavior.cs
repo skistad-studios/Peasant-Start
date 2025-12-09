@@ -12,15 +12,13 @@ namespace PeasantStart
     internal class VillageRecruitPeasantBehavior : CampaignBehaviorBase
     {
         private const int HoursToRecruit = 4;
-        private const int RecruitStartHour = 4;
-        private const int RecruitEndHour = 22;
 
-        private const float CharmXpPerHour = 2.0f;
-
-        private const float BaseRecruitChance = 0.1f;
+        private const float BaseRecruitChance = 0.05f;
         private const float MaxRecruitChance = 0.95f;
         private const int MaxPeasantsPerRecruitment = 6;
         private const int CostToHirePeasant = 10;
+
+        private const float CharmXpPerHour = 2.0f;
 
         private bool isRecruiting;
         private int hoursRecruited;
@@ -176,29 +174,22 @@ namespace PeasantStart
             campaignGameStarter.AddGameMenuOption(
                 "village",
                 "ps_recruit",
-                "{=ps_recruit}Recruit Peasants",
+                "{=ps_recruit_peasants}Recruit Peasants",
                 (MenuCallbackArgs args) =>
                 {
-                    bool canRecruit = this.recruitStamina >= HoursToRecruit && CampaignTime.Now.CurrentHourInDay >= RecruitStartHour && CampaignTime.Now.CurrentHourInDay < RecruitEndHour;
+                    bool canRecruit = this.recruitStamina >= HoursToRecruit && CampaignTime.Now.CurrentHourInDay >= Utilities.PeasantWakeUpHour && CampaignTime.Now.CurrentHourInDay < Utilities.PeasantSleepHour;
                     
-                    if (canRecruit)
+                    if (!canRecruit)
                     {
-                        args.Tooltip = new TextObject("{=ps_recruit_tooltip}Try to convince local peasants to join you.");
-                    }
-                    else
-                    {
-                        if (CampaignTime.Now.CurrentHourInDay < RecruitStartHour)
+                        if (CampaignTime.Now.CurrentHourInDay < Utilities.PeasantWakeUpHour || CampaignTime.Now.CurrentHourInDay >= Utilities.PeasantSleepHour)
                         {
-                            args.Tooltip = new TextObject("{=ps_recruit_too_early_tooltip}Everyone is still asleep.");
-                        }
-                        else if (CampaignTime.Now.CurrentHourInDay >= RecruitEndHour)
-                        {
-                            args.Tooltip = new TextObject("{=ps_recruit_too_late_tooltip}Everyone has went to sleep.");
+                            args.Tooltip = new TextObject("{=ps_recruit_asleep_tooltip}Everyone is asleep.");
                         }
                         else
                         {
                             MBTextManager.SetTextVariable("ps_hours_remaining_until_can_recruit", HoursToRecruit - this.recruitStamina);
-                            args.Tooltip = new TextObject("{=ps_recruit_too_tired_tooltip}You are too exhausted to sound convincing. You can attempt again in {ps_hours_remaining_until_can_recruit} hours.");
+                            MBTextManager.SetTextVariable("ps_hour_hours", HoursToRecruit - this.recruitStamina > 1 ? "{=ps_hours}hours" : "{=ps_hour}hour");
+                            args.Tooltip = new TextObject("{=ps_recruit_cooldown_tooltip}You recently recruited. You can attempt again in {ps_hours_remaining_until_can_recruit} {ps_hour_hours}.");
                         }
                     }
 
@@ -220,14 +211,15 @@ namespace PeasantStart
                 (MenuCallbackArgs args) =>
                 {
                     MBTextManager.SetTextVariable("ps_recruiting_description", "{=ps_recruiting_description}You attempt to convince some local peasants to join you.");
-                    args.MenuContext.GameMenu.SetProgressOfWaitingInMenu(0);
+                    args.MenuContext.SetBackgroundMeshName(Settlement.CurrentSettlement.Culture.StringId + "_tavern");
+                    args.MenuContext.GameMenu.SetProgressOfWaitingInMenu(this.hoursRecruited < HoursToRecruit ? (float)this.hoursRecruited / HoursToRecruit : 0);
                     args.MenuContext.GameMenu.StartWait();
                     return true;
                 },
                 null,
                 (MenuCallbackArgs args, CampaignTime dt) =>
                 {
-                    args.MenuContext.GameMenu.SetProgressOfWaitingInMenu((float)this.hoursRecruited / HoursToRecruit);
+                    args.MenuContext.GameMenu.SetProgressOfWaitingInMenu(this.hoursRecruited < HoursToRecruit ? (float)this.hoursRecruited / HoursToRecruit : 0);
                 },
                 GameMenu.MenuAndOptionType.WaitMenuShowOnlyProgressOption);
 
@@ -235,7 +227,7 @@ namespace PeasantStart
             campaignGameStarter.AddGameMenuOption(
                 "ps_village_recruiting",
                 "ps_village_stop_recruiting",
-                "{=ps_stop_recruiting]}Stop recruiting",
+                "{=ps_leave]}Leave",
                 (MenuCallbackArgs args) =>
                 {
                     args.optionLeaveType = GameMenuOption.LeaveType.Leave;
@@ -262,6 +254,8 @@ namespace PeasantStart
                     {
                         MBTextManager.SetTextVariable("ps_pick_recruits_description", "{=ps_recruit_failure}You didn't manage to convince anyone to join your cause.");
                     }
+
+                    args.MenuContext.SetBackgroundMeshName(Settlement.CurrentSettlement.Culture.StringId + "_tavern");
                 });
 
             // Pick recruits menu options
@@ -288,7 +282,7 @@ namespace PeasantStart
                     bool canHire = Hero.MainHero.Gold >= costToHire;
                     if (!canHire)
                     {
-                        args.Tooltip = new TextObject("{=ps_recruit_not_enough_gold}You can't affoard this.");
+                        args.Tooltip = new TextObject("{=ps_recruit_not_enough_gold_tooltip}You can't affoard this.");
                     }
 
                     args.IsEnabled = canHire;

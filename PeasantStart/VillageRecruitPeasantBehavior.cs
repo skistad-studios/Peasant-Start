@@ -355,7 +355,6 @@ namespace PeasantStart
 
             if (this.lastSettlement != settlement)
             {
-                InformationManager.DisplayMessage(new InformationMessage(settlement.Name.ToString()));
                 this.recruitStamina = RecruitCooldown;
                 this.lastSettlement = settlement;
             }

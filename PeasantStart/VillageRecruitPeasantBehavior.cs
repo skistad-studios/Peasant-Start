@@ -167,7 +167,7 @@ namespace PeasantStart
 
         internal float GetPeasantRecruitChance()
         {
-            return MBMath.ClampFloat(BaseRecruitChance + (Hero.MainHero.GetSkillValue(DefaultSkills.Charm) * 0.01f) - (Hero.MainHero.Clan.Tier * ClanTierRecruitChancePenalty), BaseRecruitChance, MaxRecruitChance);
+            return MBMath.ClampFloat(BaseRecruitChance + (Hero.MainHero.GetSkillValue(DefaultSkills.Charm) * 0.01f), BaseRecruitChance, MaxRecruitChance - (Hero.MainHero.Clan.Tier * ClanTierRecruitChancePenalty));
         }
 
         internal CharacterObject GetPeasantFromCulture(CultureObject culture)

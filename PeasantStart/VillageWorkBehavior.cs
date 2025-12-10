@@ -316,22 +316,22 @@ namespace PeasantStart
 
             if (CampaignTime.Now.CurrentHourInDay < Utilities.PeasantWakeUpHour)
             {
-                MBTextManager.SetTextVariable(WorkingDescriptionId, "{=ps_working_description_sleep}The laborers have gone to sleep.");
+                MBTextManager.SetTextVariable(WorkingDescriptionId, "{=ps_working_description_sleep}The villagers have gone to sleep.");
                 args.MenuContext.SetBackgroundMeshName(Settlement.CurrentSettlement.SettlementComponent.WaitMeshName);
             }
             else if (CampaignTime.Now.CurrentHourInDay < Utilities.PeasantWorkHour)
             {
-                MBTextManager.SetTextVariable(WorkingDescriptionId, "{=ps_working_description_too_early}The laborers are getting ready for their day.");
+                MBTextManager.SetTextVariable(WorkingDescriptionId, "{=ps_working_description_too_early}The villagers are getting ready for their day.");
                 args.MenuContext.SetBackgroundMeshName(Settlement.CurrentSettlement.SettlementComponent.WaitMeshName);
             }
             else if (CampaignTime.Now.CurrentHourInDay >= Utilities.PeasantSleepHour)
             {
-                MBTextManager.SetTextVariable(WorkingDescriptionId, "{=ps_working_description_sleep}The laborers have gone to sleep.");
+                MBTextManager.SetTextVariable(WorkingDescriptionId, "{=ps_working_description_sleep}The villagers have gone to sleep.");
                 args.MenuContext.SetBackgroundMeshName(Settlement.CurrentSettlement.SettlementComponent.WaitMeshName);
             }
             else if (CampaignTime.Now.CurrentHourInDay >= Utilities.PeasantLeisureHour)
             {
-                MBTextManager.SetTextVariable(WorkingDescriptionId, "{=ps_working_description_too_late}The laborers have turned in for the day, and are relaxing around the village.");
+                MBTextManager.SetTextVariable(WorkingDescriptionId, "{=ps_working_description_too_late}The villagers have turned in for the day, and are relaxing around the village.");
                 args.MenuContext.SetBackgroundMeshName(Settlement.CurrentSettlement.Culture.StringId + "_tavern");
             }
             else if (this.hoursWorked >= HoursInShift)

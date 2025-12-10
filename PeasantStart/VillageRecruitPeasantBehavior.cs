@@ -1,11 +1,10 @@
-﻿using System;
-using TaleWorlds.CampaignSystem;
+﻿using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
 namespace PeasantStart
@@ -16,6 +15,7 @@ namespace PeasantStart
 
         private const float BaseRecruitChance = 0.2f;
         private const float MaxRecruitChance = 0.95f;
+        private const float ClanTierRecruitChancePenalty = 0.1f;
         private const int MaxPeasantsPerRecruitment = 6;
         private const int CostToHirePeasant = 10;
 
@@ -166,7 +166,7 @@ namespace PeasantStart
 
         internal float GetPeasantRecruitChance()
         {
-            return Math.Min(BaseRecruitChance + (Hero.MainHero.GetSkillValue(DefaultSkills.Charm) * 0.01f), MaxRecruitChance);
+            return MBMath.ClampFloat(BaseRecruitChance + (Hero.MainHero.GetSkillValue(DefaultSkills.Charm) * 0.01f) - (Hero.MainHero.Clan.Tier * ClanTierRecruitChancePenalty), BaseRecruitChance, MaxRecruitChance);
         }
 
         internal CharacterObject GetPeasantFromCulture(CultureObject culture)
@@ -270,15 +270,9 @@ namespace PeasantStart
                 "{ps_hire_recruits_option_name_" + n + "}",
                 (MenuCallbackArgs args) =>
                 {
-                    MBTextManager.SetTextVariable($"ps_hire_count_{n}", n + 1);
-                    MBTextManager.SetTextVariable($"ps_peasant_peasants_{n}", n > 0 ? "{=ps_peasants}peasants" : "{=ps_peasant}peasant");
-                    MBTextManager.SetTextVariable($"ps_hiring_cost_{n}", costToHire);
-                    MBTextManager.SetTextVariable(
-                        $"ps_hire_recruits_option_name_{n}",
-                        "{=ps_hire_recruits}Hire {ps_hire_count} {ps_peasant_peasants} for {ps_hiring_cost}{GOLD_ICON}"
-                        .Replace("{ps_hire_count}", "{ps_hire_count_" + n + "}")
-                        .Replace("{ps_peasant_peasants}", "{ps_peasant_peasants_" + n + "}")
-                        .Replace("{ps_hiring_cost}", "{ps_hiring_cost_" + n + "}"));
+                    string text = new TextObject("{=ps_hire_recruits}Hire [ps_hire_count] [ps_peasant_peasants] for [ps_hiring_cost]{GOLD_ICON}").ToString();
+                    text = text.Replace("[ps_hire_count]", (n + 1).ToString()).Replace("[ps_peasant_peasants]", n > 0 ? "{=ps_peasants}peasants" : "{=ps_peasant}peasant").Replace("[ps_hiring_cost]", costToHire.ToString());
+                    MBTextManager.SetTextVariable($"ps_hire_recruits_option_name_{n}", text);
 
                     bool canHire = Hero.MainHero.Gold >= costToHire && PartyBase.MainParty.MemberRoster.TotalManCount + n + 1 <= PartyBase.MainParty.PartySizeLimit;
                     if (!canHire)

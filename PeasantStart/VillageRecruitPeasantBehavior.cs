@@ -12,7 +12,7 @@ namespace PeasantStart
     internal class VillageRecruitPeasantBehavior : CampaignBehaviorBase
     {
         private const int HoursToRecruit = 4;
-        private const int RecruitCooldown = 8;
+        private const int RecruitCooldown = 12;
 
         private const float BaseRecruitChance = 0.2f;
         private const float MaxRecruitChance = 0.95f;
@@ -265,16 +265,14 @@ namespace PeasantStart
             {
                 int n = i;
                 int costToHire = this.GetRecruitmentCost(n + 1);
+                string text = new TextObject("{=ps_hire_recruits}Hire [ps_hire_count] [ps_peasant_peasants] for [ps_hiring_cost][GOLD_ICON]").ToString();
+                text = text.Replace("[ps_hire_count]", (n + 1).ToString()).Replace("[ps_peasant_peasants]", n > 0 ? "{=ps_peasants}peasants" : "{=ps_peasant}peasant").Replace("[ps_hiring_cost]", costToHire.ToString()).Replace("[GOLD_ICON]", "{GOLD_ICON}");
                 campaignGameStarter.AddGameMenuOption(
                 "ps_village_pick_recruits",
                 $"ps_hire_recruits_{n}",
-                "{ps_hire_recruits_option_name_" + n + "}",
+                text,
                 (MenuCallbackArgs args) =>
                 {
-                    string text = new TextObject("{=ps_hire_recruits}Hire [ps_hire_count] [ps_peasant_peasants] for [ps_hiring_cost]{GOLD_ICON}").ToString();
-                    text = text.Replace("[ps_hire_count]", (n + 1).ToString()).Replace("[ps_peasant_peasants]", n > 0 ? "{=ps_peasants}peasants" : "{=ps_peasant}peasant").Replace("[ps_hiring_cost]", costToHire.ToString());
-                    MBTextManager.SetTextVariable($"ps_hire_recruits_option_name_{n}", text);
-
                     bool canHire = Hero.MainHero.Gold >= costToHire && PartyBase.MainParty.MemberRoster.TotalManCount + n + 1 <= PartyBase.MainParty.PartySizeLimit;
                     if (!canHire)
                     {
@@ -350,10 +348,16 @@ namespace PeasantStart
 
         private void OnSettlementEntered(MobileParty party, Settlement settlement, Hero hero)
         {
-            if (this.lastSettlement != Settlement.CurrentSettlement)
+            if (hero != Hero.MainHero)
             {
+                return;
+            }
+
+            if (this.lastSettlement != settlement)
+            {
+                InformationManager.DisplayMessage(new InformationMessage(settlement.Name.ToString()));
                 this.recruitStamina = RecruitCooldown;
-                this.lastSettlement = Settlement.CurrentSettlement;
+                this.lastSettlement = settlement;
             }
         }
 

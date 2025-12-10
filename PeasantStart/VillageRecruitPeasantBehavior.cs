@@ -12,6 +12,7 @@ namespace PeasantStart
     internal class VillageRecruitPeasantBehavior : CampaignBehaviorBase
     {
         private const int HoursToRecruit = 4;
+        private const int RecruitCooldown = 8;
 
         private const float BaseRecruitChance = 0.2f;
         private const float MaxRecruitChance = 0.95f;
@@ -52,6 +53,11 @@ namespace PeasantStart
             }
 
             if (this.isRecruiting)
+            {
+                return;
+            }
+
+            if (this.recruitStamina < RecruitCooldown)
             {
                 return;
             }
@@ -97,11 +103,6 @@ namespace PeasantStart
             }
 
             if (!this.isRecruiting)
-            {
-                return;
-            }
-
-            if (this.recruitStamina <= 0)
             {
                 return;
             }
@@ -188,12 +189,12 @@ namespace PeasantStart
                 "{=ps_recruit_peasants}Recruit Peasants",
                 (MenuCallbackArgs args) =>
                 {
-                    bool canRecruit = this.recruitStamina >= HoursToRecruit;
+                    bool canRecruit = this.recruitStamina >= RecruitCooldown;
 
                     if (!canRecruit)
                     {
-                        MBTextManager.SetTextVariable("ps_hours_remaining_until_can_recruit", HoursToRecruit - this.recruitStamina);
-                        MBTextManager.SetTextVariable("ps_hour_hours", HoursToRecruit - this.recruitStamina > 1 ? "{=ps_hours}hours" : "{=ps_hour}hour");
+                        MBTextManager.SetTextVariable("ps_hours_remaining_until_can_recruit", RecruitCooldown - this.recruitStamina);
+                        MBTextManager.SetTextVariable("ps_hour_hours", RecruitCooldown - this.recruitStamina > 1 ? "{=ps_hours}hours" : "{=ps_hour}hour");
                         args.Tooltip = new TextObject("{=ps_recruit_cooldown_tooltip}You recently recruited. You can attempt again in {ps_hours_remaining_until_can_recruit} {ps_hour_hours}, or try another village.");
                     }
 
@@ -341,7 +342,7 @@ namespace PeasantStart
             {
                 this.RecruitHour();
             }
-            else if (this.recruitStamina < HoursToRecruit)
+            else if (this.recruitStamina < RecruitCooldown)
             {
                 this.recruitStamina += 1;
             }
@@ -351,7 +352,7 @@ namespace PeasantStart
         {
             if (this.lastSettlement != Settlement.CurrentSettlement)
             {
-                this.recruitStamina = HoursToRecruit;
+                this.recruitStamina = RecruitCooldown;
                 this.lastSettlement = Settlement.CurrentSettlement;
             }
         }

@@ -3,5 +3,5 @@
     <File Path="ModuleData/items.xml" />
     <File Path="SubModule.xml" />
   </Folder>
-  <Project Path="PeasantStart/PeasantStart.csproj" />
+  <Project Path="PeasantStart/PeasantStart.csproj" Id="c0c4298b-b330-49eb-8dee-9867f3d32a54" />
 </Solution>

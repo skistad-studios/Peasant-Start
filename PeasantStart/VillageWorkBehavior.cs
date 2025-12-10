@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -17,16 +16,10 @@ namespace PeasantStart
         private const string WorkingDescriptionId = "ps_working_description";
 
         private const int HoursInShift = 8;
-
-        private const int Tier0Wage = 0;
-        private const int Tier1Wage = 3;
-        private const int Tier2Wage = 6;
-        private const int Tier3Wage = 9;
-
-        private const float Tier0WageWeight = 0.05f;
-        private const float Tier1WageWeight = 0.35f;
-        private const float Tier2WageWeight = 0.5f;
-        private const float Tier3WageWeight = 0.1f;
+        private const int BaseWage = 4;
+        private const float PercentWageIncreasePerWorker = 0.8f;
+        private const float MinWageVariance = -0.3f;
+        private const float MaxWageVariance = 0.2f;
 
         private const float AthleticsXpPerHour = 4.0f;
 
@@ -130,74 +123,41 @@ namespace PeasantStart
                 return;
             }
 
-            int goldEarned = 0;
-            int tier0WagesPaid = 0;
-            int tier1WagesPaid = 0;
-            int tier2WagesPaid = 0;
-            int tier3WagesPaid = 0;
-            int villageGold = Math.Max(Settlement.CurrentSettlement.SettlementComponent.Gold, 0);
             int workersInParty = this.GetWorkersInParty();
-
-            for (int i = 0; i < workersInParty; i += 1)
-            {
-                int wageTier = MBRandom.ChooseWeighted(new List<(int, float)> { (0, Tier0WageWeight), (1, Tier1WageWeight), (2, Tier2WageWeight), (3, Tier3WageWeight) });
-                while (GetWagesFromTier(wageTier) > villageGold - goldEarned)
-                {
-                    wageTier -= 1;
-                }
-
-                switch (wageTier)
-                {
-                    case 0:
-                        tier0WagesPaid += 1;
-                        break;
-                    case 1:
-                        tier1WagesPaid += 1;
-                        break;
-                    case 2:
-                        tier2WagesPaid += 1;
-                        break;
-                    case 3:
-                        tier3WagesPaid += 1;
-                        break;
-                }
-
-                goldEarned += GetWagesFromTier(wageTier);
-            }
-
-            if (tier0WagesPaid > 0)
-            {
-                MBTextManager.SetTextVariable("ps_tier0_wages_paid_count", tier0WagesPaid);
-                InformationManager.DisplayMessage(new InformationMessage(new TextObject("{=ps_tier0_wages_paid}{ps_tier0_wages_paid_count} of your party members were not paid for their labor.").ToString()));
-            }
-
-            if (tier1WagesPaid > 0)
-            {
-                MBTextManager.SetTextVariable("ps_tier1_wages_paid_count", tier1WagesPaid);
-                MBTextManager.SetTextVariable("ps_tier1_wage", Tier1Wage);
-                InformationManager.DisplayMessage(new InformationMessage(new TextObject("{=ps_tier1_wages_paid}{ps_tier1_wages_paid_count} of your party members were paid {ps_tier1_wage}{GOLD_ICON} for their labor.").ToString()));
-            }
-
-            if (tier2WagesPaid > 0)
-            {
-                MBTextManager.SetTextVariable("ps_tier2_wages_paid_count", tier2WagesPaid);
-                MBTextManager.SetTextVariable("ps_tier2_wage", Tier2Wage);
-                InformationManager.DisplayMessage(new InformationMessage(new TextObject("{=ps_tier2_wages_paid}{ps_tier2_wages_paid_count} of your party members were paid {ps_tier2_wage}{GOLD_ICON} for their labor.").ToString()));
-            }
-
-            if (tier3WagesPaid > 0)
-            {
-                MBTextManager.SetTextVariable("ps_tier3_wages_paid_count", tier3WagesPaid);
-                MBTextManager.SetTextVariable("ps_tier3_wage", Tier3Wage);
-                InformationManager.DisplayMessage(new InformationMessage(new TextObject("{=ps_tier3_wages_paid}{ps_tier3_wages_paid_count} of your party members were paid {ps_tier3_wage}{GOLD_ICON} for their labor.").ToString()));
-            }
+            float goldEarnedFraction = BaseWage;
+            goldEarnedFraction *= 1 + (PercentWageIncreasePerWorker * (workersInParty - 1));
+            goldEarnedFraction *= 1 + MBRandom.RandomFloatRanged(MinWageVariance, MaxWageVariance);
+            int goldEarned = Math.Min((int)Math.Round(goldEarnedFraction), Settlement.CurrentSettlement.SettlementComponent.Gold);
 
             MBTextManager.SetTextVariable("ps_gold_earned", goldEarned);
-            InformationManager.DisplayMessage(new InformationMessage(new TextObject("{=ps_total_wages_paid}Your party was paid a total wage of {ps_gold_earned}{GOLD_ICON} for their labor.").ToString(), goldEarned > 0 ? "event:/ui/notification/coins_positive" : null));
 
             if (goldEarned > 0)
             {
+                if (workersInParty > 1)
+                {
+                    InformationManager.DisplayMessage(
+                        new InformationMessage(new TextObject("{=ps_wages_paid_with_party}Your party was paid a total wage of {ps_gold_earned}{GOLD_ICON} for their labor.").ToString(),
+                        goldEarned > 0 ? "event:/ui/notification/coins_positive" : null));
+                }
+                else
+                {
+                    InformationManager.DisplayMessage(
+                        new InformationMessage(new TextObject("{=ps_wages_paid_without_party}Your were paid a wage of {ps_gold_earned}{GOLD_ICON} for your labor.").ToString(),
+                        goldEarned > 0 ? "event:/ui/notification/coins_positive" : null));
+                }
+
                 GiveGoldAction.ApplyForSettlementToCharacter(Settlement.CurrentSettlement, Hero.MainHero, goldEarned, true);
+            }
+            else
+            {
+                if (workersInParty > 1)
+                {
+                    InformationManager.DisplayMessage(new InformationMessage(new TextObject("{=ps_wages_not_paid_with_party}The village was unable to pay your party for their labor.").ToString()));
+                }
+                else
+                {
+                    InformationManager.DisplayMessage(new InformationMessage(new TextObject("{=ps_wages_not_paid_without_party}The village was unable to pay you for your labor.").ToString()));
+                }
             }
         }
 
@@ -225,27 +185,6 @@ namespace PeasantStart
             }
 
             return workersInParty;
-        }
-
-        internal int GetWagesFromTier(int tier)
-        {
-            switch (tier)
-            {
-                case 0:
-                    return Tier0Wage;
-
-                case 1:
-                    return Tier1Wage;
-
-                case 2:
-                    return Tier2Wage;
-
-                case 3:
-                    return Tier3Wage;
-
-                default:
-                    return 0;
-            }
         }
 
         private void AddMenuOption(CampaignGameStarter campaignGameStarter)

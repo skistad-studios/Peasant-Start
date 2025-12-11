@@ -1,4 +1,5 @@
-﻿using TaleWorlds.CampaignSystem;
+﻿using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
@@ -24,15 +25,13 @@ namespace PeasantStart
 
         private bool isRecruiting;
         private int hoursRecruited;
-        private int recruitStamina;
         private int peasantsRecruited;
-        private Settlement lastSettlement;
+        private Dictionary<Settlement, int> settlementRecruitCooldown = new Dictionary<Settlement, int>();
 
         public override void RegisterEvents()
         {
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, this.OnSessionLaunched);
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, this.OnHourlyTick);
-            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, this.OnSettlementEntered);
             CampaignEvents.VillageBeingRaided.AddNonSerializedListener(this, this.OnVillageBeingRaided);
         }
 
@@ -40,9 +39,8 @@ namespace PeasantStart
         {
             dataStore.SyncData("ps_isRecruiting", ref this.isRecruiting);
             dataStore.SyncData("ps_hoursRecruited", ref this.hoursRecruited);
-            dataStore.SyncData("ps_recruitStamina", ref this.recruitStamina);
             dataStore.SyncData("ps_peasantsRecruited", ref this.peasantsRecruited);
-            dataStore.SyncData("ps_lastRecruitedSettlement", ref this.lastSettlement);
+            dataStore.SyncData("ps_settlementRecruitCooldown", ref this.settlementRecruitCooldown);
         }
 
         internal void StartRecruiting()
@@ -57,7 +55,7 @@ namespace PeasantStart
                 return;
             }
 
-            if (this.recruitStamina < RecruitCooldown)
+            if (this.settlementRecruitCooldown.ContainsKey(Settlement.CurrentSettlement))
             {
                 return;
             }
@@ -86,7 +84,7 @@ namespace PeasantStart
             if (this.hoursRecruited >= HoursToRecruit)
             {
                 this.peasantsRecruited = this.RollPeasantsRecruited();
-                this.recruitStamina = 0;
+                this.settlementRecruitCooldown[Settlement.CurrentSettlement] = RecruitCooldown;
                 GameMenu.SwitchToMenu("ps_village_pick_recruits");
             }
             else
@@ -189,13 +187,13 @@ namespace PeasantStart
                 "{=ps_recruit_peasants}Recruit Peasants",
                 (MenuCallbackArgs args) =>
                 {
-                    bool canRecruit = this.recruitStamina >= RecruitCooldown;
+                    bool canRecruit = !this.settlementRecruitCooldown.ContainsKey(Settlement.CurrentSettlement);
 
                     if (!canRecruit)
                     {
-                        MBTextManager.SetTextVariable("ps_hours_remaining_until_can_recruit", RecruitCooldown - this.recruitStamina);
-                        MBTextManager.SetTextVariable("ps_hour_hours", RecruitCooldown - this.recruitStamina > 1 ? "{=ps_hours}hours" : "{=ps_hour}hour");
-                        args.Tooltip = new TextObject("{=ps_recruit_cooldown_tooltip}You recently recruited. You can attempt again in {ps_hours_remaining_until_can_recruit} {ps_hour_hours}, or try another village.");
+                        MBTextManager.SetTextVariable("ps_hours_remaining_until_can_recruit", this.settlementRecruitCooldown[Settlement.CurrentSettlement]);
+                        MBTextManager.SetTextVariable("ps_hour_hours", this.settlementRecruitCooldown[Settlement.CurrentSettlement] > 1 ? "{=ps_hours}hours" : "{=ps_hour}hour");
+                        args.Tooltip = new TextObject("{=ps_recruit_cooldown_tooltip}You have recruited recently in this village. You can attempt again in {ps_hours_remaining_until_can_recruit} {ps_hour_hours}, or try another village.");
                     }
 
                     args.IsEnabled = canRecruit;
@@ -340,23 +338,17 @@ namespace PeasantStart
             {
                 this.RecruitHour();
             }
-            else if (this.recruitStamina < RecruitCooldown)
+            else
             {
-                this.recruitStamina += 1;
-            }
-        }
-
-        private void OnSettlementEntered(MobileParty party, Settlement settlement, Hero hero)
-        {
-            if (hero != Hero.MainHero)
-            {
-                return;
-            }
-
-            if (this.lastSettlement != settlement)
-            {
-                this.recruitStamina = RecruitCooldown;
-                this.lastSettlement = settlement;
+                List<Settlement> settlements = new List<Settlement>(this.settlementRecruitCooldown.Keys);
+                for (int i = 0; i < settlements.Count; i += 1)
+                {
+                    this.settlementRecruitCooldown[settlements[i]] -= 1;
+                    if (this.settlementRecruitCooldown[settlements[i]] <= 0)
+                    {
+                        this.settlementRecruitCooldown.Remove(settlements[i]);
+                    }
+                }
             }
         }
 
